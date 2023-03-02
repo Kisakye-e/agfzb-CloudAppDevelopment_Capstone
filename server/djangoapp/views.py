@@ -96,11 +96,48 @@ def get_dealerships(request):
         return HttpResponse(dealer_names)
 
 
-# Create a `get_dealer_details` view to render the reviews of a dealer
-# def get_dealer_details(request, dealer_id):
-# ...
-
 # Create a `add_review` view to submit a review
-# def add_review(request, dealer_id):
-# ...
+def add_review(request, dealer_id):
+    context = {}
+    # If it is a GET request, just render the add_review page
+    if request.method == 'GET':
+        url = "https://us-south.functions.appdomain.cloud/api/v1/web/8d60ccb3-aab5-46e0-8022-870551e76f2f/dealership-package/get-dealership"
+        # Get dealers from the URL
+        context = {
+            "dealer_id": dealer_id,
+            "dealer_name": get_dealers_from_cf(url)[dealer_id-1].full_name,
+            "cars": CarModel.objects.all()
+        }
+        #print(context)
+        return render(request, 'djangoapp/add_review.html', context)
+    elif request.method == 'POST':
+        if (request.user.is_authenticated):
+            review = dict()
+            review["id"]=0#placeholder
+            review["name"]=request.POST["name"]
+            review["dealership"]=dealer_id
+            review["review"]=request.POST["content"]
+            if ("purchasecheck" in request.POST):
+                review["purchase"]=True
+            else:
+                review["purchase"]=False
+            print(request.POST["car"])
+            if review["purchase"] == True:
+                car_parts=request.POST["car"].split("|")
+                review["purchase_date"]=request.POST["purchase_date"] 
+                review["car_make"]=car_parts[0]
+                review["car_model"]=car_parts[1]
+                review["car_year"]=car_parts[2]
 
+            else:
+                review["purchase_date"]=None
+                review["car_make"]=None
+                review["car_model"]=None
+                review["car_year"]=None
+            json_result = post_request("https://us-south.functions.appdomain.cloud/api/v1/web/8d60ccb3-aab5-46e0-8022-870551e76f2f/dealership-package/post-review", review, dealerId=dealer_id)
+            print(json_result)
+            if "error" in json_result:
+                context["message"] = "ERROR: Review was not submitted."
+            else:
+                context["message"] = "Review was submited"
+        return redirect("djangoapp:dealer_details", dealer_id=dealer_id)
